@@ -1,1 +1,50 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s
+   0.052478042s  INFO prepare_target{force=false package_id=mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust) target="mini_python_run"}: cargo::core::compiler::fingerprint: fingerprint error for mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("mini_python_run", ["cdylib"], "/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust/src/lib.rs", Edition2024) }
+   0.052494042s  INFO prepare_target{force=false package_id=mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust) target="mini_python_run"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust/target/debug/.fingerprint/mini_python_run-71a77ab67355db12/lib-mini_python_run`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+   0.061708375s  INFO prepare_target{force=false package_id=mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust) target="mini_python_run"}: cargo::core::compiler::fingerprint: fingerprint error for mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("mini_python_run", ["cdylib"], "/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust/src/lib.rs", Edition2024) }
+   0.061715584s  INFO prepare_target{force=false package_id=mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust) target="mini_python_run"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust/target/debug/.fingerprint/mini_python_run-7ead5716418369a9/test-lib-mini_python_run`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+    Checking mini_python_run v0.1.0 (/Users/louis/Documents/COURS/2ÈME ANNÉE/PRG/jeu/mini_python_rust)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
