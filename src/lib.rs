@@ -28,6 +28,10 @@ fn compute(
 #[unsafe(no_mangle)]
 fn transform(data:*mut std::ffi::c_double,len:usize,){
     let values = unsafe { std::slice::from_raw_parts_mut(data, len) };
-    println!("{:?}", values.reverse());
-    println!("{:?}", values);
+
+    values.reverse();
+    for v in values.iter_mut() {
+        *v += 10.0;
+    }
+    println!("Reversed values :{:?}", values);
 }
