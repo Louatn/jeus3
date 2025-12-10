@@ -13,4 +13,3 @@ lto = true
 strip = "debuginfo" # should be "symbols" but not supported on MacOS
 
 [dependencies]
-

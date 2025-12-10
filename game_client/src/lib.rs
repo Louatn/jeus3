@@ -1,6 +1,10 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 use std::usize;
+use std::{
+    io::{BufRead, BufReader, Write},
+    net::TcpStream,
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -203,6 +207,8 @@ struct Application {
     status: UpdateStatus,
     image: Image,
     position: Point,
+    input: BufReader<TcpStream>,
+    output: TcpStream,
 }
 
 fn init_application(
@@ -218,11 +224,43 @@ fn init_application(
     *dt = 1.0 / 30.0;
     println!("{}×{}@{:.3}", width, height, dt);
 
+    let server_name = args.get(3).ok_or("missing server name")?.to_string();
+    let server_port = args.get(4).ok_or("missing server port")?.parse::<u16>()?;
+
+    println!("connecting to server {}:{}", server_name, server_port);
+    
+    let stream = TcpStream::connect((server_name, server_port))?;
+    let mut output = stream.try_clone()?;
+    let mut input = BufReader::new(stream);
+
+    for word in ["12", "-4", "hop", "3"] {
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let request = format!("{}\n", word);
+        println!("\nsending request {:?} to server...", request);
+        output.write_all(request.as_bytes())?;
+
+        println!("waiting for reply from server...");
+        let mut reply = String::new();
+        let r = input.read_line(&mut reply)?;
+        if r == 0 {
+            println!("EOF");
+            break;
+        }
+
+        println!("obtained {:?} from server", reply);
+        if let Ok(value) = reply.trim().parse::<i32>() {
+            println!("~~> {}", value);
+        }
+    }
+
+
     Ok(Application {
         status: UpdateStatus::GoOn,
         image: image,
         position: Point { x: 100, y: 100 },
-
+        input,
+        output,
     })
 }
 
