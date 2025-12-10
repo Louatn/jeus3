@@ -1,0 +1,16 @@
+[package]
+name = "game_client"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+strip = "debuginfo" # should be "symbols" but not supported on MacOS
+
+[dependencies]
+
