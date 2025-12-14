@@ -1,3 +1,45 @@
+####################
+# Rust / Cargo
+####################
+
+# Dossiers de build (PARTOUT)
 target/
+**/target/
+
+# Fichiers temporaires rustc / flycheck
+**/.rustc_info.json
+**/flycheck*/
+**/CACHEDIR.TAG
+
+# Lock file (à ignorer si projet applicatif étudiant)
+**/Cargo.lock
+
+
+####################
+# Archives
+####################
 archive/
-.gitignore
+
+
+####################
+# OS / éditeurs
+####################
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/
+
+
+####################
+# Exécutables / scripts générés
+####################
+
+# Binaires éventuels
+*.exe
+*.out
