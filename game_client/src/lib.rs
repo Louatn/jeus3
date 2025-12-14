@@ -5,6 +5,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::TcpStream,
 };
+use std::io::ErrorKind;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -279,24 +280,9 @@ fn update_application(
             evt, btn, key, point.x, point.y, screen.width, screen.height
         );
     }
-    app.status = UpdateStatus::GoOn;
-    if let Some(motion) = handle_event(app, evt, key) {
-        println!("motion: {:?}", motion);
-        app.position.x += motion.x;
-        app.position.y += motion.y;
-        app.status = UpdateStatus::Redraw;
-    }
-    
-    redraw_if_needed(app, screen);
-    Ok(app.status)
-}
 
-fn handle_event(
-    app: &mut Application,
-    evt: &str,
-    key: &str,
-) -> Option<Point> {
-    let mut motion = None;
+    app.status = UpdateStatus::GoOn;
+    let mut motion: Option<Point> = None;
     match evt {
         "C" => app.status = UpdateStatus::Redraw,
         "Q" => app.status = UpdateStatus::Quit,
@@ -311,7 +297,41 @@ fn handle_event(
         },
         _ => {}
     }
-    motion
+
+    if let Some(m) = motion {
+        println!("motion: {:?}", m);
+        let msg = format!("motion {} {}\n", m.x, m.y);
+        app.output.write_all(msg.as_bytes())?;
+    }
+    handle_event(app)?;
+    
+    redraw_if_needed(app, screen);
+    Ok(app.status)
+}
+
+fn handle_event(
+    app: &mut Application,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let msg = read_lines_nonblocking(&mut app.input)?;
+
+    for line in msg {
+        if line.is_empty() {
+            println!("server closed connection");
+            app.status = UpdateStatus::Quit;
+        } else {
+            if let Some(data) = line.strip_prefix("position ") {
+                let mut words = data.split_whitespace();
+                let x = words.next().ok_or("missing x")?.parse::<i32>()?;
+                let y = words.next().ok_or("missing y")?.parse::<i32>()?;
+                
+                app.position.x += x;
+                app.position.y += y;
+                app.status = UpdateStatus::Redraw;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn redraw_if_needed(
@@ -320,13 +340,51 @@ fn redraw_if_needed(
 ) {
     if let UpdateStatus::Redraw = app.status {
         for c in screen.pixels.iter_mut() {
-            c.r = 0 as u8;
-            c.g = 0 as u8;
-            c.b = 0 as u8;
+            *c = Color { r: 0, g: 0, b: 0 };
         }
         let transparent_color: Option<&Color> = Some(&Color { r: 0, g: 0, b: 255 });
         draw_image(screen, &app.image, &app.position, transparent_color);
     }
 }
+
+
+fn read_lines_nonblocking(
+    input: &mut BufReader<TcpStream>
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    fn inner(
+        input: &mut BufReader<TcpStream>
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let mut lines = Vec::new();
+        loop {
+            let mut line = String::new();
+            match input.read_line(&mut line) {
+                Ok(r) => {
+                    if !line.is_empty() {
+                        lines.push(line);
+                    }
+                    if r == 0 {
+                        lines.push(String::new()); // EOF
+                        break;
+                    }
+                }
+                Err(e) => {
+                    if e.kind() != ErrorKind::WouldBlock {
+                        Err(e)?
+                    }
+                    if line.is_empty() {
+                        // line not started, don't wait for the end
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(lines)
+    }
+    input.get_mut().set_nonblocking(true)?;
+    let result = inner(input);
+    input.get_mut().set_nonblocking(false)?;
+    result
+}
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

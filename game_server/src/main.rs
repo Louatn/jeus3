@@ -37,11 +37,23 @@ fn handle_connection(
         }
 
         println!("obtained {:?} from client", request);
-        let reply = match request.trim().parse::<i32>() {
+
+        let mut x = 0;
+        let mut y = 0;
+        let reply;
+        if let Some(data) = request.strip_prefix("motion ") {
+            let mut words = data.split_whitespace();
+            x += words.next().ok_or("missing x")?.parse::<i32>()?;
+            y += words.next().ok_or("missing y")?.parse::<i32>()?;
+  
+            reply = format!("position {} {}\n", x, y);
+            
+        } else {
+            reply = match request.trim().parse::<i32>() {
             Ok(value) => format!("{}\n", value * value),
             Err(e) => format!("invalid request: {}\n", e),
         };
-
+    }
         println!("sending reply {:?} to client...", reply);
         output.write_all(reply.as_bytes())?;
     }
