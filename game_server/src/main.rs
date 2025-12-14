@@ -2,6 +2,13 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::{Ipv4Addr, TcpListener, TcpStream},
 };
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Point {
+    x: i32,
+    y: i32,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Vec::from_iter(std::env::args());
@@ -38,24 +45,22 @@ fn handle_connection(
 
         println!("obtained {:?} from client", request);
 
-        let mut x = 0;
-        let mut y = 0;
-        let reply;
-        if let Some(data) = request.strip_prefix("motion ") {
-            let mut words = data.split_whitespace();
-            x += words.next().ok_or("missing x")?.parse::<i32>()?;
-            y += words.next().ok_or("missing y")?.parse::<i32>()?;
-  
-            reply = format!("position {} {}\n", x, y);
-            
-        } else {
-            reply = match request.trim().parse::<i32>() {
-            Ok(value) => format!("{}\n", value * value),
-            Err(e) => format!("invalid request: {}\n", e),
+        let reply = match request.split_once(' ') {
+            Some(("motion", data)) => {
+                let pos = serde_json::from_str::<Point>(data.trim())?;
+                println!("received motion: {:?}", pos);
+
+                // on ne met pas de tiret pour renvoyer un objet JSON, qui sera donc associé à la valeur de reply
+                format!("position {}\n", serde_json::to_string(&pos)?)
+            }
+            _ => match request.trim().parse::<i32>() {
+                Ok(value) => format!("{}\n", value * value),
+                Err(e) => format!("invalid request: {}\n", e),
+            },
         };
-    }
         println!("sending reply {:?} to client...", reply);
         output.write_all(reply.as_bytes())?;
-    }
+       
+    }  
     Ok(())
 }

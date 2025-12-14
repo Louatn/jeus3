@@ -1,11 +1,12 @@
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 use std::usize;
 use std::{
     io::{BufRead, BufReader, Write},
     net::TcpStream,
 };
 use std::io::ErrorKind;
+
+use serde::{Deserialize, Serialize};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -189,7 +190,7 @@ enum UpdateStatus {
     Quit,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct Point {
     x: i32,
     y: i32,
@@ -282,7 +283,25 @@ fn update_application(
     }
 
     app.status = UpdateStatus::GoOn;
-    let mut motion: Option<Point> = None;
+
+    if let Some(motion) = handle_event(app, evt, key) {
+        println!("motion: {:?}", motion);
+        //on envoie un objet Point au serveur
+        let msg = format!("motion {}\n", serde_json::to_string(&motion)?);
+        app.output.write_all(msg.as_bytes())?;
+    }
+    handle_messages(app)?;
+    redraw_if_needed(app, screen);
+    Ok(app.status)
+}
+
+
+fn handle_event(
+    app: &mut Application,
+    evt: &str,
+    key: &str,
+) -> Option<Point> {
+    let mut motion = None;
     match evt {
         "C" => app.status = UpdateStatus::Redraw,
         "Q" => app.status = UpdateStatus::Quit,
@@ -297,19 +316,11 @@ fn update_application(
         },
         _ => {}
     }
-
-    if let Some(m) = motion {
-        println!("motion: {:?}", m);
-        let msg = format!("motion {} {}\n", m.x, m.y);
-        app.output.write_all(msg.as_bytes())?;
-    }
-    handle_event(app)?;
-    
-    redraw_if_needed(app, screen);
-    Ok(app.status)
+    motion
 }
 
-fn handle_event(
+
+fn handle_messages(
     app: &mut Application,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let msg = read_lines_nonblocking(&mut app.input)?;
@@ -319,14 +330,17 @@ fn handle_event(
             println!("server closed connection");
             app.status = UpdateStatus::Quit;
         } else {
-            if let Some(data) = line.strip_prefix("position ") {
-                let mut words = data.split_whitespace();
-                let x = words.next().ok_or("missing x")?.parse::<i32>()?;
-                let y = words.next().ok_or("missing y")?.parse::<i32>()?;
-                
-                app.position.x += x;
-                app.position.y += y;
-                app.status = UpdateStatus::Redraw;
+        // on sépare la commande et les données ( attention ce n'est pas la méthode du cours je crois)
+            match line.split_once(" ") {
+                Some(("position", data)) => {
+                    //on récupère l'objet Point envoyé par le serveur
+                    let pos = serde_json::from_str::<Point>(data.trim())?;
+                    println!("received position: {:?}", pos);
+                    app.position.x += pos.x;
+                    app.position.y += pos.y;
+                    app.status = UpdateStatus::Redraw;
+                }
+                _ => {}
             }
         }
     }
