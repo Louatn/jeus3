@@ -9,13 +9,18 @@ use std::io::ErrorKind;
 use serde::{Deserialize, Serialize};
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Image{
     width: usize,
     height: usize,
     pixels: Vec<Color>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Motion{
+    point: Point,
+    id: usize,
+}
 fn load_image(path: &str) -> Result<Image, Box<dyn std::error::Error>>{
 
     let content = std::fs::read(path)?;
@@ -196,7 +201,7 @@ struct Point {
     y: i32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct Color {
     r: u8,
     g: u8,
@@ -206,11 +211,18 @@ struct Color {
 #[derive(Debug)]
 #[allow(dead_code)]
 struct Application {
+    myself: Player,
+    players: Vec<Player>,
     status: UpdateStatus,
-    image: Image,
-    position: Point,
     input: BufReader<TcpStream>,
     output: TcpStream,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Player{
+    id: usize,
+    position: Point,
+    image: Image,
 }
 
 fn init_application(
@@ -220,7 +232,6 @@ fn init_application(
     dt: &mut f64,
 ) -> Result<Application, Box<dyn std::error::Error>> {
     println!("args: {:?}", args);
-    let image = load_image(args[2]).unwrap();
     *width = 800;
     *height = 600;
     *dt = 1.0 / 30.0;
@@ -233,34 +244,23 @@ fn init_application(
     
     let stream = TcpStream::connect((server_name, server_port))?;
     let mut output = stream.try_clone()?;
-    let mut input = BufReader::new(stream);
+    let  input = BufReader::new(stream);
 
-    for word in ["12", "-4", "hop", "3"] {
-        std::thread::sleep(std::time::Duration::from_millis(1000));
+    let image = load_image(args[2]).unwrap();
+    let msg = format!("newplayer {}\n", serde_json::to_string(&image)?);
+        output.write_all(msg.as_bytes())?;
 
-        let request = format!("{}\n", word);
-        println!("\nsending request {:?} to server...", request);
-        output.write_all(request.as_bytes())?;
 
-        println!("waiting for reply from server...");
-        let mut reply = String::new();
-        let r = input.read_line(&mut reply)?;
-        if r == 0 {
-            println!("EOF");
-            break;
-        }
-
-        println!("obtained {:?} from server", reply);
-        if let Ok(value) = reply.trim().parse::<i32>() {
-            println!("~~> {}", value);
-        }
-    }
 
 
     Ok(Application {
+        myself: Player {
+            id: 0,
+            position: Point { x: 0, y: 0 },
+            image,
+        },
+        players: Vec::new(),
         status: UpdateStatus::GoOn,
-        image: image,
-        position: Point { x: 100, y: 100 },
         input,
         output,
     })
@@ -287,7 +287,7 @@ fn update_application(
     if let Some(motion) = handle_event(app, evt, key) {
         println!("motion: {:?}", motion);
         //on envoie un objet Point au serveur
-        let msg = format!("motion {}\n", serde_json::to_string(&motion)?);
+        let msg = format!("motion {}\n", serde_json::to_string(&(&motion.id, &motion.point))?);
         app.output.write_all(msg.as_bytes())?;
     }
     handle_messages(app)?;
@@ -300,17 +300,18 @@ fn handle_event(
     app: &mut Application,
     evt: &str,
     key: &str,
-) -> Option<Point> {
+) -> Option<Motion> {
     let mut motion = None;
+    let id = app.myself.id;
     match evt {
         "C" => app.status = UpdateStatus::Redraw,
         "Q" => app.status = UpdateStatus::Quit,
         "KP" => match key {
             "Escape" => app.status = UpdateStatus::Quit,
-            "Left" => motion = Some(Point { x: -10, y: 0 }),
-            "Right" => motion = Some(Point { x: 10, y: 0 }),
-            "Up" => motion = Some(Point { x: 0, y: -10 }),
-            "Down" => motion = Some(Point { x: 0, y: 10 }),
+            "Left" => motion = Some(Motion { point: Point { x: -10, y: 0 }, id }),
+            "Right" => motion = Some(Motion { point: Point { x: 10, y: 0 }, id }),
+            "Up" => motion = Some(Motion { point: Point { x: 0, y: -10 }, id }),
+            "Down" => motion = Some(Motion { point: Point { x: 0, y: 10 }, id }),
             " " => app.status = UpdateStatus::Redraw,
             _ => {}
         },
@@ -334,10 +335,46 @@ fn handle_messages(
             match line.split_once(" ") {
                 Some(("position", data)) => {
                     //on récupère l'objet Point envoyé par le serveur
-                    let pos = serde_json::from_str::<Point>(data.trim())?;
-                    println!("received position: {:?}", pos);
-                    app.position.x += pos.x;
-                    app.position.y += pos.y;
+                    let (id, pos) = serde_json::from_str::<(usize, Point)>(data.trim())?;
+                    println!("received position: {:?}", (id, pos));
+                    if id == app.myself.id {
+                        app.myself.position.x += pos.x;
+                        app.myself.position.y += pos.y;
+                    }
+                    else {
+                        let mut found = false;
+                        for p in app.players.iter_mut() {
+                            if p.id == id {
+                                p.position.x += pos.x;
+                                p.position.y += pos.y;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            println!("Warning: received position for unknown player id={}", id);
+                        }
+                    }
+                    app.status = UpdateStatus::Redraw;
+                }
+                Some(("added", data)) => {
+                    let (id, position, players) = serde_json::from_str::<(usize, Point, Vec<Player>)>(data.trim())?;
+                    app.myself.position = position;
+                    app.myself.id = id;
+                    app.players = players;
+                }
+
+                Some(("newplayerconnect", data)) => {
+                    let (id, position, image) = serde_json::from_str::<(usize, Point, Image)>(data.trim())?;
+                    println!("New player connected: id={}, position={:?}, image size={}x{}", id, position, image.width, image.height);
+                    app.players.push(Player { id, position, image });
+                    app.status = UpdateStatus::Redraw;
+                }
+
+                Some(("disconnect", data)) => {
+                    let disconnected_id = serde_json::from_str::<usize>(data.trim())?;
+                    println!("Player disconnected: id={}", disconnected_id);
+                    app.players.retain(|p| p.id != disconnected_id);
                     app.status = UpdateStatus::Redraw;
                 }
                 _ => {}
@@ -357,7 +394,10 @@ fn redraw_if_needed(
             *c = Color { r: 0, g: 0, b: 0 };
         }
         let transparent_color: Option<&Color> = Some(&Color { r: 0, g: 0, b: 255 });
-        draw_image(screen, &app.image, &app.position, transparent_color);
+        draw_image(screen, &app.myself.image, &app.myself.position, transparent_color);
+        for player in &app.players {
+            draw_image(screen, &player.image, &player.position, transparent_color);
+        }
     }
 }
 
